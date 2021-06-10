@@ -1,0 +1,47 @@
+{
+   "lithops":{
+      "lithops" : {
+         "storage": "ibm_cos",
+         "storage_bucket": "mass-sentiment-gatherer-bucket"
+      },
+      "ibm_cf": {
+         "runtime": "ismaelca/msg_python39:0.1",
+         "endpoint": "",
+         "namespace": "",
+         "api_key": ""
+      },
+      "ibm_cos": {
+         "endpoint": "",
+         "private_endpoint": "",
+         "access_key": "",
+         "secret_key": ""
+      }
+    },
+
+    "search": {
+      "countries": [
+        "Spain"
+      ],
+      "langs": [
+        "es"
+      ],
+      "topics": [
+        "Coronavirus",
+        "Covid19"
+      ],
+      "since": "2019-12-1",
+      "output_folder": "../data/"
+    },
+
+    "sentiment_analizer": {
+      "ml_training": {
+         "learning_rate": 0.001,
+         "epochs": 15,
+         "wordvector_dimension": 300,
+         "data_maxlen": 200,
+         "tokenizer_words": 5000,
+         "test_size": 0.2,
+         "batch_size": 256
+      }
+    }
+}
