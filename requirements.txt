@@ -6,6 +6,7 @@ lithops
 matplotlib
 pandas
 git+https://github.com/twintproject/twint.git#egg=twint
+jsonpickle
 
 # Setup modules
 gevent

@@ -8,18 +8,16 @@ SENTIMENTS_DIR = SAMPLES_DIR+"sentiments/"
 WORDVECTORS_DIR = SAMPLES_DIR+"wordvectors/"
 
 
-PUB_INTERVAL = 0.1
-CLOUD_OBJ_NAME = "raw_array.data"
-CLOUD_OBJ_PUB_BUFFER_SIZE = 10
-COS_BUCKET_NAME = "mass-sentiment-gatherer-bucket"
-COS_DELIM = "~"
-
+PUB_INTERVAL = 1
 
 # MSG samples Folder
 MODELS_DIR = "../models/"
 
 # Wanted chars to perform sentiment
-CLEAN_CHARS = " abcdefghijklmnopqrstuvwxyzàáèéìíòóùúçñABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÈÉÌÍÒÓÙÚÇÑ"
+CLEAN_CHARS = " abcdefghijklmnopqrstuvwxyzàáèéìíòóùúçñABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÈÉÌÍÒÓÙÚÇÑ-"
 
 # CSV File
 CSV_FILE = "../data/data.csv"
+
+#Print header
+HEAD = "[ MSGatherer ] "
