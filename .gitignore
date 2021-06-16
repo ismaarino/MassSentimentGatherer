@@ -1,7 +1,9 @@
 .lithops_config
 data/
-training/sentiments/*/
-training/wordvectors/*/
+training/sentiments/ca/
+training/sentiments/es/
+training/wordvectors/ca/
+training/wordvectors/es/
 src/__pycache__/
 src/client/__pycache__/
 config/msgconf.json
