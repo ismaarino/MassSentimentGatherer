@@ -4,9 +4,13 @@ tensorflow==2.5.0
 keras==2.4.3
 lithops
 matplotlib
+fsspec
 pandas
 git+https://github.com/twintproject/twint.git#egg=twint
 jsonpickle
+chart_studio
+plotly
+func_timeout
 
 # Setup modules
 gevent

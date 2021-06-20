@@ -1,7 +1,5 @@
 .lithops_config
 data/
-training/sentiments/ca/
-training/sentiments/es/
 training/wordvectors/ca/
 training/wordvectors/es/
 src/__pycache__/

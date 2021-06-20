@@ -1,63 +1,78 @@
+######################################################################
+#                  Pràctica Sistemes Distribuïts URV                 #
+######################################################################
+#                         Fitxer: processing.py                      #
+#                         Autor: Ismael Curto                        #
+######################################################################
 import twint
 import csv
 import pandas as pd
 import json
 import copy
 import globals as g
-from lithops import FunctionExecutor
-from store import CloudDataFramePublisher, CloudReader
-import datetime
-import unicodedata
-import jsonpickle
-from tfsentiment import Analizer
+from storage import CloudDataFramePublisher, CloudRAWReader
+import datetime, jsonpickle, pickle
+from tools import p, jump, warn, count_elements, normalize
 
-def normalize(data):
-	return unicodedata.normalize('NFKC', data)
 
 def process_data(thread_data):
-	pickled_arr = thread_data[0]
-	analizers = thread_data[1]
-	df = pd.DataFrame(columns=["t_id","date","near","content","likes","lang","SA"])
-	for pickled in pickled_arr:
+	reader = CloudRAWReader(thread_data[0],thread_data[1],"rb")
+	lines = reader.readlines(thread_data[2],thread_data[3])
+	reader.close()
+	from tfsentiment import Analyzer
+	Analyzers = {}
+	for lang in thread_data[4]["langs"]:
+		try:
+			Analyzers[lang] = Analyzer(lang, True, thread_data[4])
+			Analyzers[lang].setTokenizer(thread_data[5][lang])
+		except:
+			Analyzers[lang] = 0
+			warn("Analyzer for language: "+lang+" couldn't be created.")
+	df = pd.DataFrame(columns=thread_data[4]["dataframe_atributes"])
+	for pickled in lines:
 		unpickled = jsonpickle.decode(pickled)
 		for tweet in unpickled:
 			tweet_text = normalize(tweet["tweet"])
-			tweet_dic = {"t_id":tweet["id_str"], "date":tweet["datestamp"], "near":tweet["near"], "content":tweet_text, "likes":tweet["likes_count"], "lang":tweet["lang"], "SA":analizers[tweet["lang"]].analysis(tweet_text) }
-			df = df.append(pd.DataFrame([tweet_dic], columns=["t_id","date","near","content","likes"]), ignore_index = False, verify_integrity=False, sort=None)
+			try:
+				sa = Analyzers[tweet["lang"]].analysis(tweet_text)
+			except:
+				sa = "-"
+				warn("SA for Tweet "+tweet["id_str"]+" couldn't be performed.")
+			tweet_dic = {"t_id":tweet["id_str"], "date":tweet["datestamp"], "near":tweet["near"], "content":tweet_text, "likes":tweet["likes_count"], "lang":tweet["lang"], "SA": sa }
+			df = df.append(pd.DataFrame([tweet_dic], columns=thread_data[4]["dataframe_atributes"]), ignore_index = False, verify_integrity=False, sort=None)
 	return df
 
-def process(cloud_object, conf):
-	analizers = {}
+def process(cloud_object, conf, fexec):
+	p("Counting elements in object: "+cloud_object+" ...")
+	lines = count_elements(cloud_object, conf["lithops"], fexec)
+	p("The selected raw data object has "+str(lines)+" elements.")
+	tokenizers = {}
 	for lang in conf["langs"]:
-		analizers[lang] = Analizer(lang, conf)
-	pickled_arr = CloudReader(cloud_object, conf["lithops"]).readlines()
-	print("Downloaded object with "+str(len(pickled_arr))+" elements.")
-	processing_list = []
-	tl = conf["processing"]["threading_level"]
-	increment = int(len(pickled_arr) / tl)
-	if increment == 0:
-		increment = 1
-	i = 0
-	while i < len(pickled_arr) :
-		t_list = []
-		for j in range(i,i+increment):
-			if j >= len(pickled_arr):
-				break
-			t_list.append(pickled_arr[j])
-			processing_list.append([copy.deepcopy(t_list), copy.deepcopy(analizers)])
-		i += increment
-	fexec = FunctionExecutor(config=conf["lithops"])
-	fexec.map(process_data, processing_list)
+		tokenizers[lang] = copy.deepcopy(pickle.load(open("../models/"+lang+"/"+lang+"_tokenizer.pickle", 'rb')))
+	p("Generating thread configurations...")
+	i=0
+	incr=conf["processing"]["threading_level"]
+	while i < lines :
+		if i+incr > lines:
+			incr = lines-i
+		p(str(i)+"-"+str(incr))
+		fexec.call_async(process_data, [cloud_object,conf["lithops"], i, incr, conf, tokenizers])
+		i+=incr
+
 	results = fexec.get_result()
-	print(results[0])
+
 	nresults = len(results)
-	if nresults > 0 and len(results[0]) > 0 :
-		print("\n\n"+g.HEAD+"Completed all with "+str(nresults)+" results.\nStoring results...")
-		publisher = CloudDataFramePublisher("data", conf["processing"]["cloud_file_extension"], conf['lithops'])
-		for i in range(nresults):
-			publisher.commit(results[i])
+	data_cloud_key = ""
+	if nresults > 0 :
+		p("Completed all with "+str(nresults)+" results.\nStoring results...")
+		publisher = CloudDataFramePublisher("data_", conf["processing"]["cloud_file_extension"], conf['lithops'])
+		data_cloud_key = publisher.key()
+		for result in results:
+			if result is not False :
+				publisher.commit(result)
 		publisher.close()
-		fexec.clean()
 	else:
-		print(g.HEAD+"Could not find any data.")
-	print("Done.")
+		warn("Could not find any data.")
+	p("Done.")
+
+	return data_cloud_key

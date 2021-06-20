@@ -1,12 +1,21 @@
+######################################################################
+#                  Pràctica Sistemes Distribuïts URV                 #
+######################################################################
+#                         Fitxer: tfsentiment.py                     #
+#                         Autor: Ismael Curto                        #
+######################################################################
 import globals as g
 import os
 import re
 import random
+import json
 import numpy as np
 import pandas as pd
 import tensorflow as tensor
 from tensorflow import keras
+from storage import CloudReader, CloudH5Reader
 import pickle
+import copy
 import matplotlib.pyplot as plt
 
 from numpy import array, array, asarray, zeros
@@ -18,14 +27,27 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 
+def getmodelfromfile(filename):
+	return keras.models.load_model(filename)
 
-class Analizer:
-	def __init__(self, lang, conf):
+def getmodelfromH5(filename, lithops_conf):
+	model = ""
+	try:
+		h5_reader = CloudH5Reader(filename, lithops_conf, "rb")
+		model = keras.models.load_model(h5_reader.getH5())
+		h5_reader.close()
+	except:
+		raise Exception("Model "+filename+" can't be found at cloud storage.")
+	return  model
+
+class Analyzer:
+	def __init__(self, lang, cloud ,conf):
 		self.tag_re = re.compile(r'<[^>]+>')
 		self.hashtag_re = re.compile(r'#[^ ]+')
 		self.mention_re = re.compile(r'@[^ ]+')
 		self.url_re = re.compile(r'http[^ ]+')
 		self.conf = conf
+		self.cloud = cloud
 		self.model = self.set_model(lang)
 
 	def open_files(dir, encoding, contains):
@@ -59,9 +81,9 @@ class Analizer:
 
 	def generate_model(self, d_dir, model_name, tokenizer_name, lang):
 		encoding = open(g.SENTIMENTS_DIR+lang+"/enc.txt").readlines()[0]
-		positive_files = Analizer.open_files(g.SENTIMENTS_DIR+lang+"/", encoding, "positive")
-		negative_files = Analizer.open_files(g.SENTIMENTS_DIR+lang+"/", encoding, "negative")
-		neutral_files = Analizer.open_files(g.SENTIMENTS_DIR+lang+"/", encoding, "neutral")
+		positive_files = Analyzer.open_files(g.SENTIMENTS_DIR+lang+"/", encoding, "positive")
+		negative_files = Analyzer.open_files(g.SENTIMENTS_DIR+lang+"/", encoding, "negative")
+		neutral_files = Analyzer.open_files(g.SENTIMENTS_DIR+lang+"/", encoding, "neutral")
 		positive = []
 		negative = []
 		neutral = []
@@ -155,6 +177,9 @@ class Analizer:
 	def model_summary(self):
 		return self.model.summary()
 
+	def model(self):
+		return self.model
+
 	def evaluate_model(self, X_text, y_test):
 		score = self.model.evaluate(X_test, y_test, verbose=1)
 		print("Test Score:", score[0])
@@ -164,53 +189,31 @@ class Analizer:
 		d_dir = g.MODELS_DIR+lang+"/"
 		model_name = lang+"_model.h5"
 		tokenizer_name = lang+"_tokenizer.pickle"
-		if(Analizer.exist_file(d_dir+model_name, False) and Analizer.exist_file(d_dir+tokenizer_name, False)):
-			self.model_tokenizer = pickle.load(open(d_dir+tokenizer_name, 'rb'))
-			return keras.models.load_model(d_dir+model_name)
-		elif self.check_supported(lang):
+		if(self.cloud or Analyzer.exist_file(d_dir+model_name, False) and Analyzer.exist_file(d_dir+tokenizer_name, False)):
+			if self.cloud:
+				return getmodelfromH5(model_name,self.conf["lithops"])
+			else:
+				self.model_tokenizer = pickle.load(open(d_dir+tokenizer_name, 'rb'))
+				return getmodelfromfile(d_dir+model_name)
+		elif self.check_supported(lang) and not self.cloud:
 			return self.generate_model(d_dir, model_name, tokenizer_name, lang)
 		else :
 			raise Exception("Labeled sentiment data or Pre-trained Model must be provided to support lang: "+lang)
 		return None
 
 	def check_supported(self, lang):
-		return Analizer.exist_file(g.WORDVECTORS_DIR+lang+"/"+lang+".vec",True) and Analizer.exist_file(g.SENTIMENTS_DIR+lang+"/enc.txt",True) and Analizer.exist_file(g.SENTIMENTS_DIR+lang+"/positive_"+lang+".txt",True) and Analizer.exist_file(g.SENTIMENTS_DIR+lang+"/negative_"+lang+".txt",True)
+		return Analyzer.exist_file(g.WORDVECTORS_DIR+lang+"/"+lang+".vec",True) and Analyzer.exist_file(g.SENTIMENTS_DIR+lang+"/enc.txt",True) and Analyzer.exist_file(g.SENTIMENTS_DIR+lang+"/positive_"+lang+".txt",True) and Analyzer.exist_file(g.SENTIMENTS_DIR+lang+"/negative_"+lang+".txt",True)
+
+	def setTokenizer(self, tokenizer):
+		self.model_tokenizer = tokenizer
 
 	def analysis(self, data):
-		try:
-			c_data = self.clean(data)
-			print(c_data)
-			test = self.model_tokenizer.texts_to_sequences(c_data)
-			flat_list = []
-			for sublist in test:
-				for item in sublist:
-					flat_list.append(item)
-			flat_list = [flat_list]
-			test = pad_sequences(flat_list, padding='post', maxlen=self.data_maxlen)
-			return self.model.predict(test)[0][0]
-		except Exception as e:
-			return 0.50
-
-"""
-a = Analizer("es");
-print(a.analysis("El covid esta peor que nunca"))
-print(a.analysis("Ya se termina el covid, estoy muy contenta"))
-print(a.analysis("Que asco la enfermedad nueva esta"))
-print(a.analysis("Al menos con el covid nos podemos quedar en casa "))
-print(a.analysis("No me gusta nada el covid"))
-print(a.analysis("Gracias a las personas que salvan a otras"))
-print(a.analysis("Puto covid de los cojones"))
-print(a.analysis("Voy a matar a alguien como sigamos encerrados"))
-print(a.analysis("Me encanta cuando me miras bb"))
-print(a.analysis("Hola amigos! Hoy directito de twitch esta noche"))
-print(a.analysis("Te odio"))
-print(a.analysis("Estoy contento"))
-print(a.analysis("Estoy triste"))
-print(a.analysis("Denuncian a Vox, pero Ana Rosa y Vicente Vallés no se enterarán, sus “fuentes” solo les traen noticias sobre los cortes de pelo de Pablo Iglesias."))
-print(a.analysis("La estafa que es VOX ya lo contó un Concejal del partido. "))
-print(a.analysis("La noticia de que denuncian a Vox es utilizada para que se deje de hablar del escándalo de Pablo Iglesias y el CNI, o de los recortes en Sanidad para el 2024, no"))
-print(a.analysis("Muere la abuela de Cristina Pedroche por covid: 'Deberían ser eternos'"))
-print(a.analysis("Hoy estoy aqui para decir que me cago en todos tus muertos"))
-print(a.analysis("Vale la pena vivir en este pais"))
-print(a.analysis("No me gusta españa"))
-print(a.analysis("Me encanta españa"))"""
+		c_data = self.clean(data)
+		test = self.model_tokenizer.texts_to_sequences(c_data)
+		flat_list = []
+		for sublist in test:
+			for item in sublist:
+				flat_list.append(item)
+		flat_list = [flat_list]
+		test = pad_sequences(flat_list, padding='post', maxlen=self.conf["ml_training"]["data_maxlen"])
+		return self.model.predict(test)[0][0]

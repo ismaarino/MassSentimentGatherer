@@ -1,17 +1,48 @@
-import json
+######################################################################
+#                  Pràctica Sistemes Distribuïts URV                 #
+######################################################################
+#                         Fitxer: msg.py                             #
+#                         Autor: Ismael Curto                        #
+######################################################################
 import globals as g
-import gathering, processing
+from tools import warn, jump
+from lithops import FunctionExecutor
+import json, gathering, processing, queries
+
+def create_fexec(lithops_config):
+	try:
+		return FunctionExecutor(config=lithops_config)
+	except:
+		jump(2)
+		warn("Unable to create Lithops Function Executor with memory param. Trying default...\n\n")
+		return FunctionExecutor(config=lithops_config)
 
 
 def init():
-	### Part 1 #######################################
+
 	config = json.load(open(g.CONFIG_FILE)) # Carreguem la config del fitxer de configuració
-	#cloud_object = gathering.gather(config) # Executem la funció per obtenir i guardar dades del mòdul gathering
-	#print(cloud_object)
-	### Part 2 #######################################
-	cloud_object = "raw_Jun-17-2021____6995e5aa-cef8-11eb-b923-e4e749360e9f.rawdata"
-	processing.process(cloud_object, config) # Processem les dades que hem generat i li apliquem el sentiment analisis
 
-	### Part 3 #######################################
+	fexec = create_fexec(config["lithops"]) # Creem una instància del Function Executor amb la config del fitxer
 
-init()
+	### Part 1 Gathering #########################################################
+	#raw_cloud_object = gathering.gather(config, fexec) # Obtenir i guardar dades amb el mòdul gathering
+	#print(raw_cloud_object)
+	##############################################################################
+
+
+	### Part 2 Processing ########################################################
+	#proc_cloud_object = processing.process(raw_cloud_object, config, fexec) # Processem les dades que hem generat i li apliquem el sentiment analisis
+	#print(proc_cloud_object)
+	##############################################################################
+
+
+	### Part 3 Querying ##########################################################
+	#print(queries.perform(proc_cloud_object, "SA < 0.5", config, fexec)) # Query d'exemple
+	##############################################################################
+
+
+	fexec.clean() # Llimpiem les dades d'execució del Function FunctionExecutor
+
+
+if __name__ == "__main__":
+	init()

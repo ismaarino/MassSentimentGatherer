@@ -1,17 +1,16 @@
-import twint
-import csv
+######################################################################
+#                  Pràctica Sistemes Distribuïts URV                 #
+######################################################################
+#                         Fitxer: gathering.py                       #
+#                         Autor: Ismael Curto                        #
+######################################################################
+import twint, csv
 import pandas as pd
-import json
-import re
-import time
-import io
-import copy
+import json, re, time, io, copy
+from tools import p, jump, warn
 import globals as g
-from lithops import FunctionExecutor
-from store import CloudDataFramePublisher, CloudRawDataPublisher
-import datetime
-import unicodedata
-import jsonpickle
+from storage import CloudDataFramePublisher, CloudRawDataPublisher
+import datetime, unicodedata, jsonpickle
 
 class Tweet():
 	pass
@@ -32,9 +31,10 @@ def run_search(thread_config):
 		tweets.append(tweet_data_object)
 	return jsonpickle.encode(tweets, unpicklable=False)
 
-def gather(conf):
-	print("\n\n"+g.HEAD+"Starting job with config:\n\t\tLanguages: "+str(conf["search"]["langs"])+",\n\t\tTopics: "+str(conf["search"]["topics"])+",\n\t\tNear: "+str(conf["search"]["places"])+",\n\t\tSince: "+conf["search"]["since"]+",\n\t\tTo: "+conf["search"]["to"]+",\n\t\tMax.TPD: "+str(conf["search"]["tweets-per-day"])+"\n")
-	print(g.HEAD+"Generating time intervals... \n")
+def gather(conf, fexec):
+	jump(3)
+	p("Starting job with config:\n\t\tLanguages: "+str(conf["langs"])+",\n\t\tTopics: "+str(conf["search"]["topics"])+",\n\t\tNear: "+str(conf["search"]["places"])+",\n\t\tSince: "+conf["search"]["since"]+",\n\t\tTo: "+conf["search"]["to"]+",\n\t\tMax.TPD: "+str(conf["search"]["tweets-per-day"])+"\n")
+	p("Generating time intervals... \n")
 	d0 = datetime.datetime.strptime(conf["search"]["since"], '%Y-%m-%d')
 	if conf["search"]["to"] == "now" :
 		d1 = datetime.datetime.now()
@@ -58,11 +58,12 @@ def gather(conf):
 	c.Store_object = True
 	c.Limit = day_incr * conf["search"]["tweets-per-day"]
 
-	print(g.HEAD+"Generating Twint (https://github.com/twintproject/twint) search configurations...")
+	p("Generating Twint (https://github.com/twintproject/twint) search configurations...")
 
 	for t in range(int(threadinglevel)) :
 		un = si + datetime.timedelta(days=day_incr-1)
-		for lang in conf["search"]["langs"]:
+		p(str(un)+" "+str(si))
+		for lang in conf["langs"]:
 			for place in conf["search"]["places"]:
 				for topic in conf["search"]["topics"]:
 					c.Search = topic+" lang:"+lang
@@ -74,28 +75,29 @@ def gather(conf):
 					configs.append([copy.deepcopy(c),conf["wanted_twint_atributes"]])
 
 		si = si + datetime.timedelta(days=day_incr)
-		margin = un - si
+		margin = d1 - si
 		if margin.days <= 0 :
 			break
-	print(g.HEAD+"Generated "+str(len(configs))+" configurations for the specified input parameters.\n")
-	print(g.HEAD+"Launching Lithops Cloud Function Executor \n")
-	fexec = FunctionExecutor(config=conf["lithops"])
-	print("\n"+g.HEAD+"Waiting to complete "+str(len(configs))+" threads\n")
+	p("Generated "+str(len(configs))+" configurations for the specified input parameters.")
+	p("Launching Lithops Cloud Function Executor")
+	p("Waiting to complete "+str(len(configs))+" threads")
+	jump(3)
 	fexec.map(run_search, configs)
 	results = fexec.get_result()
+	#results =  []
 
 	nresults = len(results)
 	object_key = ""
 	if nresults > 0 and len(results[0]) > 0 :
-		print("\n\n"+g.HEAD+"Completed all with "+str(nresults)+" results.\nStoring results...")
+		p("Completed all with "+str(nresults)+" results.\nStoring results...")
 		publisher = CloudRawDataPublisher("raw", conf["search"]["cloud_file_extension"], conf['lithops'])
+
 		for i in range(nresults):
 			publisher.commit(results[i])
 		object_key = publisher.key()
 		publisher.close()
-		fexec.clean()
 	else:
-		print(g.HEAD+"Could not find any data.")
-	print("Done.")
+		warn("Could not find any data.")
+	p("Done.")
 
 	return object_key

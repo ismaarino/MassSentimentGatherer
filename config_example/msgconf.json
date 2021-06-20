@@ -1,0 +1,61 @@
+{
+   "lithops":{
+      "lithops" : {
+         "storage": "ibm_cos",
+         "storage_bucket": "your-bucket"
+      },
+      "ibm_cf": {
+         "runtime": "username/runtime_python39:tag",
+         "endpoint": "https://yourzone.functions.cloud.ibm.com",
+         "namespace": "YourSpace",
+         "api_key": ""
+      },
+      "ibm_cos": {
+         "endpoint": "https://yourzone.cloud-object-storage.appdomain.cloud",
+         "region": "yourzone",
+         "private_endpoint": "https://sX.private.yourzone.cloud-object-storage.appdomain.cloud",
+         "access_key": "",
+         "secret_key": ""
+      }
+    },
+
+    "wanted_twint_atributes": [ "id_str","datestamp","near","tweet","likes_count" ],
+    "dataframe_atributes": [ "t_id","date","near","content","likes","lang","SA" ],
+
+    "langs": [
+     "es"
+    ],
+
+    "search": {
+      "places": [
+        "","España","Tarragona","Madrid","Málaga","Barcelona","Valencia","Santiago de Compostela"
+      ],
+      "topics": [
+        "Coronavirus","Covid19"
+      ],
+      "since": "2019-12-1",
+      "to": "now",
+      "tweets-per-day": 100,
+      "threading_level": 3,
+      "cloud_file_extension": "rawdata"
+    },
+
+    "processing": {
+      "cloud_file_extension": "csv",
+      "threading_level": 40
+    },
+
+    "queries": {
+      "threading_level": 10
+    },
+
+   "ml_training": {
+      "learning_rate": 0.001,
+      "epochs": 15,
+      "wordvector_dimension": 300,
+      "data_maxlen": 200,
+      "tokenizer_words": 5000,
+      "test_size": 0.2,
+      "batch_size": 256
+   }
+}
